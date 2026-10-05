@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <!-- Mismo ancho de dibujo que la app (FR_ANCHO_PANTALLA en Code.gs) -->
+  <meta name="viewport" content="width=590, user-scalable=no">
+  <title>Fedde Rifas</title>
+  <meta name="description" content="Crea tu rifa en minutos, compártela por WhatsApp y lleva el control de cada número.">
+  <meta name="theme-color" content="#140A30">
+  <link rel="icon" type="image/png" href="icono.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fedde Rifas">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    html, body { margin: 0; height: 100%; background: #140A30; overflow: hidden; }
+    #app { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #140A30; }
+    #cargando {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(600px 400px at 50% 40%, #3A1A8C, #140A30); transition: opacity .4s;
+    }
+    #cargando img { width: 240px; animation: latido 1.4s ease-in-out infinite; }
+    #cargando.fuera { opacity: 0; pointer-events: none; }
+    @keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  </style>
+</head>
+<body>
+  <div id="cargando"><img src="icono.png" alt="Fedde Rifas"></div>
+  <iframe id="app" title="Fedde Rifas" allow="clipboard-write; web-share"></iframe>
+
+  <script>
+    // ===== 👉 Tu link /exec de Apps Script (la misma implementación de siempre) =====
+    var EXEC = "https://script.google.com/macros/s/AKfycbxv23KnMMik9Zibu3rXHXPkTNAASZCoQ4b2vAhqza3bOzxPdswrpqVhKSxa0aDSTC-o/exec";
+
+    var marco = document.getElementById("app");
+    var esDeLaApp = function (u) { return /^https:\/\/script\.google\.com\/macros\//i.test(String(u || "")); };
+
+    // Abre la app dentro del marco, pasando lo que venga en el link (ej: ?page=ver&r=RXXXXXXX)
+    function abrir(url) {
+      var q = url.indexOf("?") >= 0 ? url.slice(url.indexOf("?")) : "";
+      try { history.replaceState(null, "", location.pathname + q); } catch (e) {}
+      marco.src = url;
+    }
+    abrir(EXEC + location.search);
+    marco.addEventListener("load", function () {
+      setTimeout(function () { document.getElementById("cargando").classList.add("fuera"); }, 600);
+    });
+
+    // Mensajes que manda la app desde adentro
+    window.addEventListener("message", function (e) {
+      if (!/\.googleusercontent\.com$/i.test(e.origin)) return;   // solo la app de Apps Script
+      var d = e.data || {};
+      if (d.fr === "hola" && e.source) { e.source.postMessage({ fr: "envoltorio" }, e.origin); return; }
+      if (d.fr === "ir" && d.url) {
+        if (esDeLaApp(d.url)) abrir(String(d.url));      // pantallas de la app: se quedan adentro
+        else location.href = String(d.url);              // Google (iniciar sesión) no se puede mostrar en un marco
+      }
+    });
+  </script>
+</body>
+</html>
