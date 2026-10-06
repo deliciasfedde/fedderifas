@@ -13,6 +13,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Fedde Rifas">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Botón oficial "Iniciar sesión con Google" (se usa sin salir de esta página) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     html, body { margin: 0; height: 100%; background: #140A30; overflow: hidden; }
     #app { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #140A30; }
@@ -23,18 +25,61 @@
     #cargando img { width: 240px; animation: latido 1.4s ease-in-out infinite; }
     #cargando.fuera { opacity: 0; pointer-events: none; }
     @keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+    /* ── Ventanita para iniciar sesión con Google (con los colores de Fedde Rifas) ── */
+    #gVentana {
+      position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+      background: rgba(8,3,24,.78); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+      font-family: 'Fredoka', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+    #gVentana.on { display: flex; }
+    #gCaja {
+      width: 500px; max-width: calc(100% - 40px); box-sizing: border-box; padding: 30px 26px 26px; text-align: center;
+      border-radius: 28px; border: 3px solid #FFC83D; color: #fff;
+      background: linear-gradient(180deg, #2F1870, #1D0E45); box-shadow: 0 24px 60px rgba(0,0,0,.6);
+    }
+    #gCaja img { width: 110px; height: 110px; display: block; margin: 0 auto 12px; }
+    #gCaja h2 { margin: 0 0 10px; font-size: 34px; line-height: 1.1; color: #FFC83D; font-weight: 800; }
+    #gCaja p { margin: 0 0 20px; font-size: 22px; line-height: 1.35; color: #E6DDFF; }
+    #gBoton { display: flex; justify-content: center; min-height: 50px; margin: 0 0 18px; }
+    .gBtn {
+      display: block; width: 100%; box-sizing: border-box; min-height: 64px; margin: 0 0 12px; padding: 12px 18px;
+      border-radius: 999px; border: 0; cursor: pointer; font: inherit; font-size: 23px; font-weight: 800;
+      background: #FFC83D; color: #2A1066; box-shadow: 0 6px 0 rgba(0,0,0,.28);
+    }
+    .gBtn.borde { background: transparent; color: #fff; border: 2px solid rgba(255,200,61,.55); box-shadow: none; }
+    .gBtn:active { transform: translateY(3px); }
+    #gNota { min-height: 1.2em; margin: 0 0 12px; font-size: 18px; color: #FF8DBA; }
+    .oculto { display: none !important; }
   </style>
 </head>
 <body>
   <div id="cargando"><img src="icono.png" alt="Fedde Rifas"></div>
   <iframe id="app" title="Fedde Rifas" allow="clipboard-write; web-share"></iframe>
 
+  <div id="gVentana" role="dialog" aria-modal="true" aria-labelledby="gTitulo">
+    <div id="gCaja">
+      <img src="icono.png" alt="">
+      <h2 id="gTitulo">Inicia sesión con Google</h2>
+      <p id="gTexto">Elige tu cuenta de Google para entrar a Fedde Rifas.</p>
+      <div id="gBoton"></div>
+      <div id="gNota"></div>
+      <button type="button" class="gBtn oculto" id="gAbrir">ABRIR EN MI NAVEGADOR</button>
+      <button type="button" class="gBtn borde oculto" id="gCopiar">Copiar el link</button>
+      <button type="button" class="gBtn borde" id="gCancelar">Cancelar</button>
+    </div>
+  </div>
+
   <script>
     // ===== 👉 Tu link /exec de Apps Script (la misma implementación de siempre) =====
     var EXEC = "https://script.google.com/macros/s/AKfycbxv23KnMMik9Zibu3rXHXPkTNAASZCoQ4b2vAhqza3bOzxPdswrpqVhKSxa0aDSTC-o/exec";
+    // ===== 👉 El mismo ID de cliente de Google que usa la app (GOOGLE_CLIENT_ID en Code.gs) =====
+    var GOOGLE_CLIENT_ID = "846284373600-t8lpa9gcr5r6o930d1qtslbkarmgih66.apps.googleusercontent.com";
 
     var marco = document.getElementById("app");
     var esDeLaApp = function (u) { return /^https:\/\/script\.google\.com\/macros\//i.test(String(u || "")); };
+    var appWin = null, appOrigen = "";   // la app de adentro (para devolverle el inicio de sesión)
+    function $(id) { return document.getElementById(id); }
 
     // Abre la app dentro del marco, pasando lo que venga en el link (ej: ?page=ver&r=RXXXXXXX)
     function abrir(url) {
@@ -44,17 +89,110 @@
     }
     abrir(EXEC + location.search);
     marco.addEventListener("load", function () {
-      setTimeout(function () { document.getElementById("cargando").classList.add("fuera"); }, 600);
+      setTimeout(function () { $("cargando").classList.add("fuera"); }, 600);
     });
+
+    // ── Navegadores internos de apps: Google NO permite iniciar sesión ahí ──
+    var UA = navigator.userAgent || "";
+    var enInstagram = /Instagram/i.test(UA);
+    var enAppInterna = /Instagram|FBAN|FBAV|FB_IAB|FB4A|FBIOS|Messenger|TikTok|musical_ly|BytedanceWebview|Line\/|Snapchat|Twitter/i.test(UA);
+    var enIOS = /iPhone|iPad|iPod/i.test(UA);
+    var enAndroid = /Android/i.test(UA);
+
+    function abrirEnNavegador() {
+      var url = location.href;
+      if (enAndroid) {
+        // Android: abre Chrome (o el navegador del teléfono) directo
+        var sinHttp = url.replace(/^https?:\/\//i, "");
+        location.href = "intent://" + sinHttp + "#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=" + encodeURIComponent(url) + ";end";
+        return;
+      }
+      if (enIOS && enInstagram) {
+        // Instagram en iPhone: su propio atajo para abrir el navegador (solo funciona como "meta refresh")
+        var m = document.createElement("meta");
+        m.httpEquiv = "refresh";
+        m.content = "0;url=instagram://extbrowser/?url=" + encodeURIComponent(url);
+        document.head.appendChild(m);
+        return;
+      }
+      if (enIOS) { location.href = "x-safari-" + url; return; }   // Facebook, WhatsApp, etc. → Safari
+      window.open(url, "_blank");
+    }
+
+    function copiarLink() {
+      var url = location.href;
+      function ok() { $("gNota").style.color = "#7CF0AE"; $("gNota").textContent = "Link copiado ✅ Pégalo en Safari o Chrome."; }
+      try { if (navigator.clipboard) { navigator.clipboard.writeText(url).then(ok, viejo); return; } } catch (e) {}
+      viejo();
+      function viejo() {
+        var t = document.createElement("textarea"); t.value = url; t.style.position = "fixed"; t.style.opacity = "0";
+        document.body.appendChild(t); t.select(); try { document.execCommand("copy"); ok(); } catch (e) {} t.remove();
+      }
+    }
+
+    // ── Ventanita de Google ──
+    var googleListo = false;
+    function prepararGoogle() {
+      if (googleListo) return true;
+      if (!(window.google && google.accounts && google.accounts.id)) return false;
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        ux_mode: "popup",
+        auto_select: false,
+        cancel_on_tap_outside: false,
+        itp_support: true,
+        callback: function (r) {
+          cerrarVentana();
+          if (r && r.credential) avisarApp({ fr: "googleToken", token: r.credential });
+        }
+      });
+      google.accounts.id.renderButton($("gBoton"), {
+        type: "standard", theme: "filled_blue", size: "large", text: "continue_with",
+        shape: "pill", logo_alignment: "left", width: 340, locale: "es"
+      });
+      googleListo = true;
+      return true;
+    }
+    function mostrarVentana() {
+      $("gNota").textContent = ""; $("gNota").style.color = "";
+      var interna = enAppInterna;
+      $("gTitulo").textContent = interna ? "Abre Fedde Rifas en tu navegador" : "Inicia sesión con Google";
+      $("gTexto").textContent = interna
+        ? "Google no permite iniciar sesión dentro de Instagram, Facebook o TikTok. Toca el botón y Fedde Rifas se abrirá en tu navegador, listo para entrar."
+        : "Elige tu cuenta de Google para entrar a Fedde Rifas.";
+      $("gBoton").style.display = interna ? "none" : "flex";
+      $("gAbrir").classList.toggle("oculto", !interna);
+      $("gCopiar").classList.toggle("oculto", !interna);
+      $("gVentana").classList.add("on");
+      if (interna) return;
+      if (!prepararGoogle()) {
+        $("gNota").textContent = "Cargando Google…";
+        var intentos = 0, t = setInterval(function () {
+          if (prepararGoogle()) { clearInterval(t); $("gNota").textContent = ""; }
+          else if (++intentos > 25) { clearInterval(t); $("gNota").textContent = "No se pudo cargar Google. Revisa tu internet e inténtalo otra vez."; }
+        }, 300);
+      }
+    }
+    function cerrarVentana() { $("gVentana").classList.remove("on"); }
+    function avisarApp(msg) {
+      if (!appWin) return;
+      try { appWin.postMessage(msg, appOrigen || "*"); } catch (e) {}
+    }
+    $("gCancelar").addEventListener("click", cerrarVentana);
+    $("gAbrir").addEventListener("click", abrirEnNavegador);
+    $("gCopiar").addEventListener("click", copiarLink);
+    $("gVentana").addEventListener("click", function (e) { if (e.target === $("gVentana")) cerrarVentana(); });
 
     // Mensajes que manda la app desde adentro
     window.addEventListener("message", function (e) {
       if (!/\.googleusercontent\.com$/i.test(e.origin)) return;   // solo la app de Apps Script
       var d = e.data || {};
+      if (e.source) { appWin = e.source; appOrigen = e.origin; }
       if (d.fr === "hola" && e.source) { e.source.postMessage({ fr: "envoltorio" }, e.origin); return; }
+      if (d.fr === "google") { mostrarVentana(); return; }
       if (d.fr === "ir" && d.url) {
         if (esDeLaApp(d.url)) abrir(String(d.url));      // pantallas de la app: se quedan adentro
-        else location.href = String(d.url);              // Google (iniciar sesión) no se puede mostrar en un marco
+        else location.href = String(d.url);              // otros links (respaldo)
       }
     });
   </script>
