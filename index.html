@@ -7,6 +7,7 @@
        cada toque en el lugar exacto (con la página achicada, Chrome corría los toques). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Fedde Rifas</title>
+  <meta name="fr-version" content="2026-10-06 v6 · sin ventanita en apps">
   <meta name="description" content="Crea tu rifa en minutos, compártela por WhatsApp y lleva el control de cada número.">
   <meta name="theme-color" content="#140A30">
   <link rel="icon" type="image/png" href="icono.png">
@@ -179,26 +180,14 @@
       return true;
     }
     // Instagram / Facebook / TikTok: al tocar el botón de Google se salta DIRECTO al navegador.
-    // La ventanita solo aparece si el salto no ocurre (algunos teléfonos lo bloquean).
+    // NUNCA se muestra ninguna ventanita encima ni detrás: solo el aviso del propio teléfono
+    // ("Estás saliendo de nuestra app" → CONTINUAR). Si toca VOLVER, basta tocar otra vez Google.
     var saltando = false;
     function saltarAlNavegador() {
       if (saltando) return;
       saltando = true;
-      var salio = false;
-      var marcar = function () { salio = true; };
-      document.addEventListener("visibilitychange", function v() { if (document.hidden) { marcar(); document.removeEventListener("visibilitychange", v); } });
-      window.addEventListener("blur", marcar, { once: true });
-      window.addEventListener("pagehide", marcar, { once: true });
       try { abrirEnNavegador(); } catch (e) {}
-      // Android (Instagram, Facebook, Messenger, TikTok…): el teléfono muestra su propio aviso
-      // "Estás saliendo de nuestra app" (VOLVER / CONTINUAR). Ahí NUNCA se pone la ventanita detrás.
-      // (El navegador de Instagram a veces se identifica como el de Meta/Facebook, sin decir "Instagram".)
-      // Si toca VOLVER, basta tocar otra vez el botón de Google.
-      if (enAndroid) { setTimeout(function () { saltando = false; }, 1200); return; }
-      setTimeout(function () {
-        saltando = false;
-        if (!salio && !document.hidden) mostrarVentana(true);   // no saltó: queda la ventanita de respaldo
-      }, 2500);
+      setTimeout(function () { saltando = false; }, 1200);
     }
 
     function mostrarVentana(respaldo) {
