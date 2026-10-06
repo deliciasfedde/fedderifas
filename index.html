@@ -2,8 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <!-- Mismo ancho de dibujo que la app (FR_ANCHO_PANTALLA en Code.gs) -->
-  <meta name="viewport" content="width=590, user-scalable=no">
+  <!-- Tamaño real del teléfono (sin achicar la página). La app se dibuja a 590 de ancho
+       (FR_ANCHO_PANTALLA en Code.gs) y aquí se achica SOLO su marco: así Chrome entrega
+       cada toque en el lugar exacto (con la página achicada, Chrome corría los toques). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Fedde Rifas</title>
   <meta name="description" content="Crea tu rifa en minutos, compártela por WhatsApp y lleva el control de cada número.">
   <meta name="theme-color" content="#140A30">
@@ -17,12 +19,12 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     html, body { margin: 0; height: 100%; background: #140A30; overflow: hidden; }
-    #app { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #140A30; }
+    #app { position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: 0; display: block; background: #140A30; transform-origin: 0 0; }
     #cargando {
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: radial-gradient(600px 400px at 50% 40%, #3A1A8C, #140A30); transition: opacity .4s;
     }
-    #cargando img { width: 240px; animation: latido 1.4s ease-in-out infinite; }
+    #cargando img { width: 240px; zoom: var(--zoom, 1); animation: latido 1.4s ease-in-out infinite; }
     #cargando.fuera { opacity: 0; pointer-events: none; }
     @keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 
@@ -34,6 +36,7 @@
     }
     #gVentana.on { display: flex; }
     #gCaja {
+      zoom: var(--zoom, 1);
       width: 500px; max-width: calc(100% - 40px); box-sizing: border-box; padding: 30px 26px 26px; text-align: center;
       border-radius: 28px; border: 3px solid #FFC83D; color: #fff;
       background: linear-gradient(180deg, #2F1870, #1D0E45); box-shadow: 0 24px 60px rgba(0,0,0,.6);
@@ -77,6 +80,28 @@
     var GOOGLE_CLIENT_ID = "846284373600-t8lpa9gcr5r6o930d1qtslbkarmgih66.apps.googleusercontent.com";
 
     var marco = document.getElementById("app");
+
+    // ── Celular: la app se dibuja a 590 de ancho y se achica el MARCO (no la página) ──
+    var ANCHO_APP = 590;
+    function ajustarMarco() {
+      var movil = false;
+      try { movil = window.matchMedia("(max-width: 768px), (hover: none) and (pointer: coarse)").matches; } catch (e) {}
+      var w = window.innerWidth || document.documentElement.clientWidth;
+      var h = window.innerHeight || document.documentElement.clientHeight;
+      if (!movil || !w) {                               // computador: como siempre, a pantalla completa
+        marco.style.width = "100%"; marco.style.height = "100%"; marco.style.transform = "";
+        document.documentElement.style.setProperty("--zoom", "1");
+        return;
+      }
+      var k = w / ANCHO_APP;
+      marco.style.width = ANCHO_APP + "px";
+      marco.style.height = Math.ceil(h / k) + "px";
+      marco.style.transform = "scale(" + k + ")";
+      document.documentElement.style.setProperty("--zoom", String(k));   // la ventanita de Google, al mismo tamaño
+    }
+    ajustarMarco();
+    window.addEventListener("resize", ajustarMarco);
+    window.addEventListener("orientationchange", function () { setTimeout(ajustarMarco, 300); });
     var esDeLaApp = function (u) { return /^https:\/\/script\.google\.com\/macros\//i.test(String(u || "")); };
     var appWin = null, appOrigen = "";   // la app de adentro (para devolverle el inicio de sesión)
     function $(id) { return document.getElementById(id); }
