@@ -178,7 +178,26 @@
       googleListo = true;
       return true;
     }
-    function mostrarVentana() {
+    // Instagram / Facebook / TikTok: al tocar el botón de Google se salta DIRECTO al navegador.
+    // La ventanita solo aparece si el salto no ocurre (algunos teléfonos lo bloquean).
+    var saltando = false;
+    function saltarAlNavegador() {
+      if (saltando) return;
+      saltando = true;
+      var salio = false;
+      var marcar = function () { salio = true; };
+      document.addEventListener("visibilitychange", function v() { if (document.hidden) { marcar(); document.removeEventListener("visibilitychange", v); } });
+      window.addEventListener("blur", marcar, { once: true });
+      window.addEventListener("pagehide", marcar, { once: true });
+      try { abrirEnNavegador(); } catch (e) {}
+      setTimeout(function () {
+        saltando = false;
+        if (!salio && !document.hidden) mostrarVentana(true);   // no saltó: queda la ventanita de respaldo
+      }, 1600);
+    }
+
+    function mostrarVentana(respaldo) {
+      if (enAppInterna && !respaldo) { saltarAlNavegador(); return; }
       $("gNota").textContent = ""; $("gNota").style.color = "";
       var interna = enAppInterna;
       $("gTitulo").textContent = interna ? "Abre Fedde Rifas en tu navegador" : "Inicia sesión con Google";
