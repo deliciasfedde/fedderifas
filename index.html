@@ -190,9 +190,11 @@
       window.addEventListener("blur", marcar, { once: true });
       window.addEventListener("pagehide", marcar, { once: true });
       try { abrirEnNavegador(); } catch (e) {}
-      // Instagram en Android muestra su propio aviso "Estás saliendo de nuestra app" (VOLVER / CONTINUAR):
-      // ahí NO se pone la ventanita de respaldo detrás. Si toca VOLVER, basta tocar otra vez el botón de Google.
-      if (enAndroid && enInstagram) { setTimeout(function () { saltando = false; }, 1200); return; }
+      // Android (Instagram, Facebook, Messenger, TikTok…): el teléfono muestra su propio aviso
+      // "Estás saliendo de nuestra app" (VOLVER / CONTINUAR). Ahí NUNCA se pone la ventanita detrás.
+      // (El navegador de Instagram a veces se identifica como el de Meta/Facebook, sin decir "Instagram".)
+      // Si toca VOLVER, basta tocar otra vez el botón de Google.
+      if (enAndroid) { setTimeout(function () { saltando = false; }, 1200); return; }
       setTimeout(function () {
         saltando = false;
         if (!salio && !document.hidden) mostrarVentana(true);   // no saltó: queda la ventanita de respaldo
